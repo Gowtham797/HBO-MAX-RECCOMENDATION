@@ -1,0 +1,697 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[1]:
+
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+# # data importing
+
+# In[2]:
+
+
+credits=pd.read_csv(r"C:\HBO-MAX\credits.csv\credits.csv")
+titles=pd.read_csv(r"C:\HBO-MAX\titles.csv\titles.csv")
+
+
+# In[3]:
+
+
+credits.head()
+
+
+# In[4]:
+
+
+credits.shape
+
+
+# In[5]:
+
+
+credits.drop_duplicates(inplace=True)
+credits.shape
+
+
+# In[6]:
+
+
+credits.isnull().sum()
+
+
+# In[7]:
+
+
+titles.head()
+
+
+# In[8]:
+
+
+titles.isnull().sum()
+
+
+# In[9]:
+
+
+titles.shape
+
+
+# In[10]:
+
+
+titles.drop_duplicates(inplace=True)
+titles.shape
+
+
+# In[11]:
+
+
+titles['description'].fillna(' ',inplace=True)
+titles.isnull().sum()
+
+
+# In[12]:
+
+
+type(titles['genres'][0])
+
+
+# In[13]:
+
+
+titles['description'][3200]
+
+
+# # data cleaning
+
+# In[14]:
+
+
+import re
+
+
+# In[15]:
+
+
+def cleaning(text):
+    text=re.sub('[^a-zA-Z0-9]',' ',text) #remove other than aplhabet,num
+    text=re.sub('\s+',' ',text) #removing extra whitespaces
+    text=text.lower()
+    return text.strip()
+
+
+# In[16]:
+
+
+cleaning(titles['description'][3200])
+
+
+# In[17]:
+
+
+titles['description']=titles['description'].apply(lambda x: cleaning(x))
+titles['description'].head()
+
+
+# In[18]:
+
+
+import spacy
+nlp=spacy.load("en_core_web_sm")
+
+
+# In[19]:
+
+
+def lemmatization(text):
+    doc=nlp(text)
+    y=' '
+    for token in doc:
+        x=token.lemma_
+        y=y+' '+x
+    return y.strip()
+
+
+# In[20]:
+
+
+lemmatization(titles['description'][3200])
+
+
+# In[21]:
+
+
+titles['description'][3200]
+
+
+# In[22]:
+
+
+from spacy.lang.en.stop_words import STOP_WORDS
+len(STOP_WORDS)
+
+
+# In[23]:
+
+
+def stop_words(text):
+    doc=nlp(text)
+    y=' '
+    for token in doc:
+        if not token.is_stop:
+            x=token.text
+            y=y+' '+x
+    return y.strip()
+
+
+# In[24]:
+
+
+stop_words(titles['description'][3200])
+
+
+# In[25]:
+
+
+titles['description']=titles['description'].apply(lambda x: lemmatization(x))
+titles['description']=titles['description'].apply(lambda x: stop_words(x))
+
+
+# In[26]:
+
+
+titles['description'][3200]
+
+
+# In[27]:
+
+
+titles['genres']=titles['genres'].apply(lambda x: cleaning(x))
+
+
+# In[28]:
+
+
+titles['genres'].head()
+
+
+# In[29]:
+
+
+titles['tags']=titles['description']+' '+titles['genres']
+
+
+# In[30]:
+
+
+titles['genres'][3200]
+
+
+# In[31]:
+
+
+len(titles['tags'][3200].split())
+
+
+# In[32]:
+
+
+titles.head()
+
+
+# # vectorization
+
+# # bow
+
+# In[33]:
+
+
+from sklearn.feature_extraction.text import CountVectorizer
+cv=CountVectorizer(max_features=500)
+
+
+# In[34]:
+
+
+requried_text=titles['tags']
+
+
+# In[35]:
+
+
+x_bow=cv.fit_transform(requried_text).toarray()
+
+
+# In[210]:
+
+
+x_bow[0]
+
+
+# # tf-idf
+
+# In[37]:
+
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+
+# In[38]:
+
+
+tfidf=TfidfVectorizer(
+    sublinear_tf=True,
+    max_features=500
+)
+
+
+# In[39]:
+
+
+x_tf=tfidf.fit_transform(requried_text).toarray()
+
+
+# In[40]:
+
+
+x_tf.shape
+
+
+# # content filtering
+
+# In[41]:
+
+
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+# In[42]:
+
+
+similarity1=cosine_similarity(x_bow)
+
+
+# In[43]:
+
+
+similarity1.shape
+
+
+# In[44]:
+
+
+sorted(list(enumerate(similarity1[5])),reverse=True,key=lambda x:x[1])[1:11]
+
+
+# In[45]:
+
+
+similarity2=cosine_similarity(x_tf)
+
+
+# In[46]:
+
+
+similarity2.shape
+
+
+# In[47]:
+
+
+sorted(list(enumerate(similarity2[5])),reverse=True,key=lambda x:x[1])[1:10]
+
+
+# In[48]:
+
+
+movie_index=titles[titles['title']=='The Wizard of Oz'].index[0]
+movie_index
+
+
+# In[49]:
+
+
+(titles.iloc[0]).title
+
+
+# In[50]:
+
+
+titles['title']=titles['title'].apply(lambda x: cleaning(x))
+
+
+# In[51]:
+
+
+(titles.iloc[0]).title
+
+
+# In[52]:
+
+
+def recommend(movie):
+    movie=cleaning(movie)
+    movie_index=titles[titles['title']==movie].index[0]
+    distances=similarity1[movie_index]
+    movie_list=sorted(enumerate(distances),reverse=True,key=lambda x:x[1])[1:11]
+    
+    for i,j in movie_list:
+        if(j>0.30):
+            print(titles.iloc[i].title,'->',j) 
+
+
+# In[53]:
+
+
+recommend('The big Sleep')
+
+
+# # collebrative filtering
+
+# In[99]:
+
+
+credits
+
+
+# In[100]:
+
+
+titles.isnull().sum()
+
+
+# In[101]:
+
+
+titles['imdb_score'].fillna(0,inplace=True)
+titles['tmdb_score'].fillna(0,inplace=True)
+
+
+# In[102]:
+
+
+titles['rating']=(titles['imdb_score']+titles['tmdb_score'])/2
+titles['rating'].head()
+
+
+# In[103]:
+
+
+titles.isnull().sum()
+
+
+# In[105]:
+
+
+titles['rating'].describe()
+
+
+# In[106]:
+
+
+print(titles['id'].shape)
+print(credits['id'].unique().shape)
+
+
+# In[107]:
+
+
+final_data=pd.merge(credits,titles,on='id',how='inner')
+final_data
+
+
+# In[108]:
+
+
+final_data[final_data['id']=='tm155702']
+
+
+# In[109]:
+
+
+print(final_data['person_id'].unique().shape)
+print(credits['person_id'].unique().shape)
+print(final_data['id'].unique().shape)
+print(credits['id'].unique().shape)
+
+
+# In[110]:
+
+
+rating=pd.concat([final_data['person_id'],final_data['id'],final_data['rating']],axis=1)
+rating
+
+
+# In[181]:
+
+
+x=rating['person_id'].value_counts()
+x[x>=10]
+
+
+# In[182]:
+
+
+y=x[x>=10].index
+y
+
+
+# In[183]:
+
+
+rating=rating[rating['person_id'].isin(y)]
+rating.head()
+
+
+# In[184]:
+
+
+rating.shape
+
+
+# In[185]:
+
+
+titles.head()
+
+
+# In[186]:
+
+
+rating_titles=rating.merge(titles,on=['id','rating'])
+
+
+# In[187]:
+
+
+num_rating=rating_titles.groupby('title')['rating'].count().reset_index()
+
+
+# In[188]:
+
+
+num_rating.rename(columns={'rating':'num_of_rating'},inplace=True)
+
+
+# In[192]:
+
+
+num_rating=num_rating[num_rating['num_of_rating']>=10]
+
+
+# In[193]:
+
+
+num_rating
+
+
+# In[194]:
+
+
+final_rating=num_rating.merge(rating_titles,on='title')
+
+
+# In[195]:
+
+
+final_rating.shape
+
+
+# In[196]:
+
+
+final_rating.head()
+
+
+# In[197]:
+
+
+final_rating.drop_duplicates(['person_id','id'],inplace=True)
+
+
+# In[198]:
+
+
+final_rating.shape
+
+
+# In[199]:
+
+
+final_rating
+
+
+# In[200]:
+
+
+rating_pivot=final_rating.pivot_table(columns='person_id',index='title',values='rating')
+
+
+# In[201]:
+
+
+rating_pivot
+
+
+# In[202]:
+
+
+rating_pivot.fillna(0,inplace=True)
+
+
+# In[203]:
+
+
+rating_pivot
+
+
+# In[204]:
+
+
+from scipy.sparse import csr_matrix
+
+
+# In[205]:
+
+
+movie_sparse=csr_matrix(rating_pivot)
+
+
+# In[206]:
+
+
+movie_sparse
+
+
+# In[207]:
+
+
+from sklearn.neighbors import NearestNeighbors
+knn = NearestNeighbors(metric='cosine', algorithm='brute', n_neighbors=15, n_jobs=-1)
+knn.fit(movie_sparse)
+
+
+# In[208]:
+
+
+def get_movie_recommendation(movie_name):
+    n_movies_to_reccomend = 5
+    movie_list = final_rating[final_rating['title'].str.contains(movie_name)]  
+    if len(movie_list):        
+        movie_idx= movie_list.iloc[0]['id']
+        movie_idx = final_rating[final_rating['id'] == movie_idx].index[0]
+        distances , indices = knn.kneighbors(movie_sparse[movie_idx],n_neighbors=n_movies_to_reccomend+1)    
+        rec_movie_indices = sorted(list(zip(indices.squeeze().tolist(),distances.squeeze().tolist())),key=lambda x: x[1])[:0:-1]
+        recommend_frame = []
+        for val in rec_movie_indices:
+            movie_idx = final_rating.iloc[val[0]]['id']
+            idx = final_rating[final_rating['id'] == movie_idx].index
+            recommend_frame.append({'Title':final_rating.iloc[idx]['title'].values[0],'Distance':val[1]})
+        df = pd.DataFrame(recommend_frame,index=range(1,n_movies_to_reccomend+1))
+        return df
+    else:
+        return "No movies found. Please check your input its all lower case :)"
+
+
+# In[209]:
+
+
+get_movie_recommendation('12 years a slave')
+
+
+# # weighted average
+
+# In[230]:
+
+
+weight_data=titles.drop(columns=['description','release_year','age_certification','runtime','genres','production_countries','seasons','tags'],axis=1)
+
+
+# In[231]:
+
+
+weight_data.head()
+
+
+# In[232]:
+
+
+from sklearn.preprocessing import MinMaxScaler
+
+
+# In[233]:
+
+
+scaler=MinMaxScaler()
+movie_scaled=scaler.fit_transform(weight_data[['rating','tmdb_popularity']])
+movie_normalized=pd.DataFrame(movie_scaled,columns=['norm_rating','norm_popularity'])
+movie_normalized.head()
+
+
+# In[235]:
+
+
+weight_data=pd.concat([weight_data,movie_normalized],axis=1)
+
+
+# In[236]:
+
+
+weight_data.head()
+
+
+# In[237]:
+
+
+weight_data['score']=weight_data['norm_rating']*0.5+weight_data['norm_popularity']*0.5
+
+
+# In[238]:
+
+
+weight_data.head()
+
+
+# In[242]:
+
+
+weight_data=weight_data.sort_values(['score'],ascending=False)
+weight_data.head(20)
+
+
+# In[243]:
+
+
+weight_data[['title','score']].head(20)
+
+
+# In[244]:
+
+
+#have to do with correlation
+
